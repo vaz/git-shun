@@ -20,6 +20,8 @@ while [ "$1" ]; do case "$1" in
       exit 1
       }
     cat "$shunfile" | xargs git shun add
+    echo >&2 "Added from $shunfile:"
+    git shun list
     exit 0 ;;
 
   l|ls|list)
@@ -53,8 +55,14 @@ while [ "$1" ]; do case "$1" in
       git update-index --no-assume-unchanged "$@"
       exit 0 ;;
 
-  c|clear)
+  c|cl|clr|clear|n|no|none)
     git shun remove --all
+    exit 0 ;;
+
+  s|st|status)
+    shift
+    git status --short "$@"
+    git shun list '\033[1;30m.. %s\033[0m'
     exit 0 ;;
 
   ''|-h|--help)
@@ -62,6 +70,8 @@ while [ "$1" ]; do case "$1" in
     cat "$0"
     exit 0 ;;
 
+  *)
+    break ;;
   esac; done
 
 # add:
