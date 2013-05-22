@@ -1,0 +1,69 @@
+#!/bin/bash
+
+shun="${SHUNFILE:-.shun}"
+
+_git-shunned () {
+  git ls-files -v | sed -ne 's/^[[:lower:]] //p' | grep .
+  }
+
+[ "$1" ] || set -- automagic
+
+while [ "$1" ]; do case "$1" in
+  --|a|add)  shift; break ;;
+
+  m|magic|auto|automa[tg]ic)
+    shift
+    shunfile="$(git rev-parse --show-toplevel)/${shun}"
+    test -f "$shunfile" || shunfile="$HOME/${shun}"
+    test -f "$shunfile" || {
+      echo >&2 "$0: can't find shun file $shunfile"
+      exit 1
+      }
+    cat "$shunfile" | xargs git shun add
+    exit 0 ;;
+
+  l|ls|list)
+    shift
+    shunned="$(_git-shunned)" || exit 1
+    fmt="%s"
+
+    for arg; do case "$arg" in
+      -c|--count) c=1; shift ;;
+      -n|--no-newline) n=1; shift ;;
+      *) fmt="$*"; break ;;
+      esac; done
+
+    [ ! $n ] && fmt="$fmt\n"
+
+    [ $c ] && shunned="$(echo "$shunned"|wc -l|xargs -n1)"
+
+    echo "$shunned" | xargs -n1 printf "$fmt"
+    exit 0 ;;
+
+  r|rm|remove)
+    shift
+    [ "$1" ] || { echo >&1 "$0: remove what?"; exit 1; }
+    case "$1" in
+      -a|--all)
+        git shun list | xargs git shun remove
+        exit 0 ;;
+      --) shift ;;
+      esac
+
+      git update-index --no-assume-unchanged "$@"
+      exit 0 ;;
+
+  c|clear)
+    git shun remove --all
+    exit 0 ;;
+
+  ''|-h|--help)
+    printf "No help. Just code.\n\n"
+    cat "$0"
+    exit 0 ;;
+
+  esac; done
+
+# add:
+git update-index --assume-unchanged "$@"
+
