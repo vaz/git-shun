@@ -2,6 +2,16 @@
 
 shun="${SHUNFILE:-.shun}"
 
+topdir="$(git rev-parse --show-toplevel)"
+oldpwd="${PWD}"
+cd "$topdir"
+
+shunfile="${topdir}/${shun}"
+test -f "$shunfile" || shunfile="$HOME/${shun}"
+test -f "$shunfile" || unset shunfile
+
+
+
 _git-shunned () {
   git ls-files -v | sed -ne 's/^[[:lower:]] //p' | grep .
   }
@@ -13,8 +23,6 @@ while [ "$1" ]; do case "$1" in
 
   m|magic|auto|automa[tg]ic)
     shift
-    shunfile="$(git rev-parse --show-toplevel)/${shun}"
-    test -f "$shunfile" || shunfile="$HOME/${shun}"
     test -f "$shunfile" || {
       echo >&2 "$0: can't find shun file $shunfile"
       exit 1
@@ -26,14 +34,17 @@ while [ "$1" ]; do case "$1" in
 
   l|ls|list)
     shift
-    shunned="$(_git-shunned)" || exit 1
     fmt="%s"
 
     for arg; do case "$arg" in
       -c|--count) c=1; shift ;;
       -n|--no-newline) n=1; shift ;;
+      -r|--relative) rel=1; shift ;;
       *) fmt="$*"; break ;;
       esac; done
+
+    [ "$rel" ] && cd "$OLDPWD"
+    shunned="$(_git-shunned)" || exit 1
 
     [ ! $n ] && fmt="$fmt\n"
 
@@ -59,10 +70,30 @@ while [ "$1" ]; do case "$1" in
     git shun remove --all
     exit 0 ;;
 
+  w|wr|write)
+    shift
+    test -f "$shunfile" || {
+      echo >&2 "$0: can't find shun file $shunfile"
+      exit 1
+      }
+    dest="$shunfile"
+    case "$1" in -a|--append) append=1; shift ;; esac
+    [ "$1" ] && dest="$1"
+
+    if [ "$append" ]; then
+      { cat "$shunfile" <(git shun list) | sort -u; } >> "$dest"
+    else
+      { git shun list | sort -u; } > "$dest"
+    fi
+
+    echo >&2 "Written to $dest:"
+    cat "$dest"
+    exit 0 ;;
+
   s|st|status)
     shift
     git status --short "$@"
-    git shun list '\033[1;30m.. %s\033[0m'
+    ( cd "$oldpwd"; git shun list --relative '\033[1;30m.. %s\033[0m' )
     exit 0 ;;
 
   ''|-h|--help)
